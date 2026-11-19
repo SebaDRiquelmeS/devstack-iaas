@@ -1,0 +1,163 @@
+OpenStack DevStack 2026.1 en Rocky Linux 9.9
+
+Instalación con Ansible
+
+PLAY [Instalar OpenStack DevStack en Rocky Linux 9] ****************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [iaas-rocky]
+
+TASK [Comprobar distribución, arquitectura e IP de gestión] ********************
+ok: [iaas-rocky] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [Validar contraseña alfanumérica] *****************************************
+ok: [iaas-rocky]
+
+TASK [Comprobar que KVM está expuesto al nodo] *********************************
+ok: [iaas-rocky]
+
+TASK [Exigir el dispositivo de KVM] ********************************************
+ok: [iaas-rocky] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [Instalar dependencias de arranque] ***************************************
+changed: [iaas-rocky]
+
+TASK [Crear usuario de servicio] ***********************************************
+changed: [iaas-rocky]
+
+TASK [Permitir que los servicios atraviesen el directorio de stack] ************
+changed: [iaas-rocky]
+
+TASK [Dar privilegios de instalación a stack] **********************************
+changed: [iaas-rocky]
+
+TASK [Obtener la revisión de DevStack 2026.1] **********************************
+changed: [iaas-rocky]
+
+TASK [Usar el repositorio de dependencias EL9 publicado por RDO] ***************
+changed: [iaas-rocky]
+
+TASK [Preparar directorio de logs] *********************************************
+changed: [iaas-rocky]
+
+TASK [Comprobar si el nodo ya está instalado] **********************************
+ok: [iaas-rocky]
+
+TASK [Aplicar configuración de laboratorio] ************************************
+changed: [iaas-rocky]
+
+TASK [Instalar DevStack y guardar una marca tras completar stack.sh] ***********
+changed: [iaas-rocky]
+
+TASK [Comprobar que finalizó la instalación] ***********************************
+ok: [iaas-rocky] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+PLAY RECAP *********************************************************************
+iaas-rocky                 : ok=16   changed=9    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+Primera ejecución de la demostración
+
+PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
+
+TASK [Gathering Facts] *********************************************************
+ok: [iaas-rocky]
+
+TASK [Copiar el script de demostración] ****************************************
+changed: [iaas-rocky]
+
+TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
+changed: [iaas-rocky]
+
+TASK [Mostrar estado, red y evidencia de arranque] *****************************
+ok: [iaas-rocky] => {
+    "demo.stdout_lines": [
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "| ID                                   | Binary       | Host           | Zone | Status  | State | Updated At                 |",
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "| 064a4bb4-77b8-4676-bac4-09d314da20bd | nova-compute | devstack-rocky | nova | enabled | up    | 2026-11-19T22:55:09.000000 |",
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "VM_CREADA",
+        "+-----------+---------------------------------------------------------+",
+        "| Field     | Value                                                   |",
+        "+-----------+---------------------------------------------------------+",
+        "| addresses | private=10.0.0.11, fddb:4b63:968f:0:f816:3eff:fe3b:2075 |",
+        "| id        | 6d7c339e-1cd1-493a-be02-177d5b3214a9                    |",
+        "| name      | iaas-cirros                                             |",
+        "| status    | ACTIVE                                                  |",
+        "+-----------+---------------------------------------------------------+",
+        "CirrOS presentó el inicio de sesión en la consola."
+    ]
+}
+
+PLAY RECAP *********************************************************************
+iaas-rocky                 : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+Segunda ejecución de la demostración
+
+PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
+
+TASK [Gathering Facts] *********************************************************
+ok: [iaas-rocky]
+
+TASK [Copiar el script de demostración] ****************************************
+ok: [iaas-rocky]
+
+TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
+ok: [iaas-rocky]
+
+TASK [Mostrar estado, red y evidencia de arranque] *****************************
+ok: [iaas-rocky] => {
+    "demo.stdout_lines": [
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "| ID                                   | Binary       | Host           | Zone | Status  | State | Updated At                 |",
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "| 064a4bb4-77b8-4676-bac4-09d314da20bd | nova-compute | devstack-rocky | nova | enabled | up    | 2026-11-19T22:55:09.000000 |",
+        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
+        "+-----------+---------------------------------------------------------+",
+        "| Field     | Value                                                   |",
+        "+-----------+---------------------------------------------------------+",
+        "| addresses | private=10.0.0.11, fddb:4b63:968f:0:f816:3eff:fe3b:2075 |",
+        "| id        | 6d7c339e-1cd1-493a-be02-177d5b3214a9                    |",
+        "| name      | iaas-cirros                                             |",
+        "| status    | ACTIVE                                                  |",
+        "+-----------+---------------------------------------------------------+",
+        "CirrOS presentó el inicio de sesión en la consola."
+    ]
+}
+
+PLAY RECAP *********************************************************************
+iaas-rocky                 : ok=4    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+Verificación de libvirt y Horizon
+Rocky Linux release 9.9 (Blue Onyx)
+x86_64
+python3.11-3.11.13-10.el9_8.x86_64
+rabbitmq-server-3.9.21-2.el9s.x86_64
+mariadb-server-10.5.29-5.el9.x86_64
+Permissive
+openstack 9.0.1
+ Id   Name              State
+---------------------------------
+ 4    devstack-rocky    running
+ -    devstack-ubuntu   saved
+
+ Id   Name                State
+-----------------------------------
+ 1    instance-00000001   running
+
+<domain type='kvm' id='1'>
+  <name>instance-00000001</name>
+  <uuid>6d7c339e-1cd1-493a-be02-177d5b3214a9</uuid>
+Horizon HTTP 200, sesión demo iniciada, iaas-cirros visible

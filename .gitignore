@@ -1,0 +1,5 @@
+ansible/ubuntu/inventory.yml
+ansible/ubuntu/secrets.yml
+*.retry
+ansible/rocky/inventory.yml
+ansible/rocky/secrets.yml

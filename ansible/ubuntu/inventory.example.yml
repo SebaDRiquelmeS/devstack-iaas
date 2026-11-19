@@ -1,0 +1,9 @@
+all:
+  children:
+    devstack:
+      hosts:
+        iaas:
+          ansible_host: 192.0.2.10
+          ansible_user: ubuntu
+          ansible_python_interpreter: /usr/bin/python3
+          devstack_host_ip: 192.0.2.10

@@ -1,0 +1,8 @@
+[[local|localrc]]
+HOST_IP={{ devstack_host_ip }}
+ADMIN_PASSWORD={{ devstack_admin_password }}
+DATABASE_PASSWORD=$ADMIN_PASSWORD
+RABBIT_PASSWORD=$ADMIN_PASSWORD
+SERVICE_PASSWORD=$ADMIN_PASSWORD
+LIBVIRT_TYPE=kvm
+LOGFILE=/opt/stack/logs/stack.sh.log

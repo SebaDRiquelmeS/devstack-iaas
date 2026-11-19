@@ -1,0 +1,21 @@
+---
+- name: Desplegar y verificar una instancia dentro de OpenStack
+  hosts: devstack
+  become: true
+  become_user: stack
+  tasks:
+    - name: Copiar el script de demostración
+      ansible.builtin.copy:
+        src: ../workspace/deploy-cirros.sh
+        dest: /opt/stack/deploy-cirros.sh
+        mode: '0700'
+
+    - name: Verificar Nova y lanzar CirrOS en la red privada
+      ansible.builtin.command: /opt/stack/deploy-cirros.sh
+      register: demo
+      changed_when: "'VM_CREADA' in demo.stdout_lines"
+
+    - name: Mostrar estado, red y evidencia de arranque
+      ansible.builtin.debug:
+        var: demo.stdout_lines
+      when: demo.stdout_lines is defined

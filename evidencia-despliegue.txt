@@ -173,3 +173,44 @@ No changes. Your infrastructure matches the configuration.
 Aprovisionamiento en libvirt de sesión para la prueba con Ansible
 Rocky 9.9 arrancó con UEFI, cloud-init terminó, el disco vda mostró 65 GiB y /dev/kvm estaba presente.
 No changes. Your infrastructure matches the configuration.
+
+Demostración con inventario generado por Terraform, variante de una interfaz
+El ensayo recuperó la instalación tras detener los servicios y reutilizar dependencias en caché. stack.sh completó y Nova quedó activo.
+rockystack-tf              : ok=17   changed=1    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
+
+PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
+
+TASK [Gathering Facts] *********************************************************
+ok: [rockystack-tf]
+
+TASK [Copiar el script de demostración] ****************************************
+changed: [rockystack-tf]
+
+TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
+changed: [rockystack-tf]
+
+TASK [Mostrar estado, red y evidencia de arranque] *****************************
+ok: [rockystack-tf] => {
+    "demo.stdout_lines": [
+        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
+        "| ID                                   | Binary       | Host          | Zone | Status  | State | Updated At                 |",
+        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
+        "| a8a6c2a9-09d8-4b50-bce2-d8cf5946af6f | nova-compute | rockystack-tf | nova | enabled | up    | 2026-11-20T01:01:53.000000 |",
+        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
+        "VM_CREADA",
+        "+-----------+---------------------------------------------------------+",
+        "| Field     | Value                                                   |",
+        "+-----------+---------------------------------------------------------+",
+        "| addresses | private=10.0.0.45, fdf5:1b8a:e5a8:0:f816:3eff:fe47:6539 |",
+        "| id        | 90cb300a-9d78-45e3-b683-8d4a2bc155b8                    |",
+        "| name      | iaas-cirros                                             |",
+        "| status    | ACTIVE                                                  |",
+        "+-----------+---------------------------------------------------------+",
+        "CirrOS presentó el inicio de sesión en la consola."
+    ]
+}
+
+PLAY RECAP *********************************************************************
+rockystack-tf              : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Horizon del nodo creado por Terraform HTTP 200

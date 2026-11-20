@@ -4,6 +4,20 @@ locals {
   external_mac   = "52:54:01:${local.mac_suffix}"
   external_cidr  = "${cidrhost(var.netstack_cidr, 0)}/24"
   external_ip    = cidrhost(local.external_cidr, 254)
+
+  cloudinit_user_data = templatefile("${path.module}/config/cloud_init.cfg", {
+    hostname   = var.hostname
+    public_key = trimspace(file(pathexpand(var.ssh_public_key_path)))
+  })
+  cloudinit_network_config = templatefile("${path.module}/config/network_config.cfg", {
+    management_mac   = local.management_mac
+    external_mac     = local.external_mac
+    netstack_enabled = var.enable_netstack
+  })
+  cloudinit_instance_id = "${var.hostname}-${substr(sha256(join("", [
+    local.cloudinit_user_data,
+    local.cloudinit_network_config,
+  ])), 0, 8)}"
 }
 
 resource "libvirt_pool" "pool" {
@@ -49,30 +63,16 @@ resource "libvirt_volume" "disk" {
 }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
-  name      = "${var.hostname}-commoninit"
-  meta_data = yamlencode({ instance-id = var.hostname, local-hostname = var.hostname })
-  user_data = templatefile("${path.module}/config/cloud_init.cfg", {
-    hostname   = var.hostname
-    public_key = trimspace(file(pathexpand(var.ssh_public_key_path)))
-  })
-  network_config = templatefile("${path.module}/config/network_config.cfg", {
-    management_mac   = local.management_mac
-    external_mac     = local.external_mac
-    netstack_enabled = var.enable_netstack
-  })
+  name           = "${var.hostname}-commoninit"
+  meta_data      = yamlencode({ instance-id = local.cloudinit_instance_id, local-hostname = var.hostname })
+  user_data      = local.cloudinit_user_data
+  network_config = local.cloudinit_network_config
 }
 
 resource "libvirt_volume" "cloudinit" {
   name   = "${var.hostname}-${substr(libvirt_cloudinit_disk.commoninit.id, 0, 12)}.iso"
   pool   = libvirt_pool.pool.name
-  target = { format = { type = "raw" } }
   create = { content = { url = libvirt_cloudinit_disk.commoninit.path } }
-
-  lifecycle {
-    create_before_destroy = true
-    # libvirt detecta ISO9660 tras la carga, aunque se cree como raw.
-    ignore_changes = [target]
-  }
 }
 
 resource "libvirt_domain" "rockystack" {
@@ -113,7 +113,7 @@ resource "libvirt_domain" "rockystack" {
       mac         = { address = local.management_mac }
       model       = { type = "virtio" }
       source      = { network = { network = var.management_network } }
-      wait_for_ip = { source = "lease", network = "0.0.0.0/0" }
+      wait_for_ip = { source = "lease", network = "0.0.0.0/0", timeout = 300 }
       }], var.enable_netstack ? [{
       type   = "network"
       mac    = { address = local.external_mac }

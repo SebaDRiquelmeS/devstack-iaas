@@ -1,216 +1,101 @@
 OpenStack DevStack 2026.1 en Rocky Linux 9.9
+Despliegue verificado con DHCP el 2026-11-20
 
-Instalación con Ansible
+==============================================================================
+1. APROVISIONAMIENTO DE LA VM CON TERRAFORM
+==============================================================================
 
-PLAY [Instalar OpenStack DevStack en Rocky Linux 9] ****************************
+Anfitrión: Linux x86_64, KVM anidado, libvirt qemu:///system y OVMF.
+Red de gestión: libvirt "default" (192.168.122.0/24) con DHCP y NAT.
+Reglas necesarias en un anfitrión con UFW:
+  sudo ufw allow in on virbr0
+  sudo ufw route allow in on virbr0
 
-TASK [Gathering Facts] *********************************************************
-ok: [iaas-rocky]
+Resultado de terraform apply:
+  Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
 
-TASK [Comprobar distribución, arquitectura e IP de gestión] ********************
-ok: [iaas-rocky] => {
-    "changed": false,
-    "msg": "All assertions passed"
-}
+La VM "rockystack" obtuvo por DHCP la IPv4 192.168.122.134 desde 192.168.122.1.
+NetworkManager escribió "nameserver 192.168.122.1" y cloud-init terminó sin
+errores. /dev/kvm estuvo disponible dentro del invitado.
 
-TASK [Validar contraseña alfanumérica] *****************************************
-ok: [iaas-rocky]
+Salida de Terraform:
+  horizon_url = "http://192.168.122.134/dashboard/"
+  ansible_host = "192.168.122.134"
+  devstack_public_interface = "devstack-ext"
+  devstack_floating_range = "172.24.4.0/24"
+  devstack_public_gateway = "172.24.4.254"
 
-TASK [Comprobar que KVM está expuesto al nodo] *********************************
-ok: [iaas-rocky]
+Segundo terraform plan:
+  No changes. Your infrastructure matches the configuration.
 
-TASK [Exigir el dispositivo de KVM] ********************************************
-ok: [iaas-rocky] => {
-    "changed": false,
-    "msg": "All assertions passed"
-}
+==============================================================================
+2. INSTALACIÓN DE OPENSTACK CON ANSIBLE
+==============================================================================
 
-TASK [Instalar dependencias de arranque] ***************************************
-changed: [iaas-rocky]
+Comando:
+  ansible-playbook -i ansible/rocky/inventory.yml ansible/rocky/preconfig.yml \
+    --vault-password-file ansible/rocky/.vault_pass \
+    -e @ansible/rocky/secrets.yml --private-key ~/.ssh/devstack_ed25519
 
-TASK [Crear usuario de servicio] ***********************************************
-changed: [iaas-rocky]
+Adaptaciones aplicadas: DNF, Python 3.11, usuario stack, sudo sin contraseña,
+revisión DevStack stable/2026.1 y repositorio de dependencias EL9 de RDO Epoxy
+para corregir el 404 del canal centos9-2026.1.
 
-TASK [Permitir que los servicios atraviesen el directorio de stack] ************
-changed: [iaas-rocky]
+Resultado:
+  PLAY RECAP
+  rockystack : ok=19 changed=9 unreachable=0 failed=0 skipped=0
 
-TASK [Dar privilegios de instalación a stack] **********************************
-changed: [iaas-rocky]
+Nova quedó con nova-compute enabled/up. MariaDB, RabbitMQ, Neutron, Glance,
+Keystone y Horizon quedaron instalados por stack.sh.
 
-TASK [Obtener la revisión de DevStack 2026.1] **********************************
-changed: [iaas-rocky]
+==============================================================================
+3. DEMOSTRACIÓN DE UNA INSTANCIA CIRROS
+==============================================================================
 
-TASK [Usar el repositorio de dependencias EL9 publicado por RDO] ***************
-changed: [iaas-rocky]
+Comando:
+  ansible-playbook -i ansible/rocky/inventory.yml ansible/demo.yml \
+    --private-key ~/.ssh/devstack_ed25519
 
-TASK [Preparar directorio de logs] *********************************************
-changed: [iaas-rocky]
+Primera ejecución:
+  VM_CREADA
+  ID: f41979bc-e91c-4371-a4a4-8c57662660e8
+  Nombre: iaas-cirros
+  Estado: ACTIVE
+  Red privada: 10.0.0.21
+  CirrOS presentó el inicio de sesión en la consola.
 
-TASK [Comprobar si el nodo ya está instalado] **********************************
-ok: [iaas-rocky]
+  PLAY RECAP
+  rockystack : ok=4 changed=2 unreachable=0 failed=0
 
-TASK [Aplicar configuración de laboratorio] ************************************
-changed: [iaas-rocky]
+Segunda ejecución:
+  Reutilizó el mismo ID f41979bc-e91c-4371-a4a4-8c57662660e8, sin VM_CREADA.
 
-TASK [Instalar DevStack y guardar una marca tras completar stack.sh] ***********
-changed: [iaas-rocky]
+  PLAY RECAP
+  rockystack : ok=4 changed=0 unreachable=0 failed=0
 
-TASK [Comprobar que finalizó la instalación] ***********************************
-ok: [iaas-rocky] => {
-    "changed": false,
-    "msg": "All assertions passed"
-}
+==============================================================================
+4. HORIZON Y ACCESO
+==============================================================================
 
-PLAY RECAP *********************************************************************
-iaas-rocky                 : ok=16   changed=9    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+Horizon:
+  http://192.168.122.134/dashboard/
+  HTTP 302 -> http://192.168.122.134/dashboard/auth/login/?next=/dashboard/
 
+El usuario "demo" obtuvo un token de Keystone con la contraseña configurada.
+En Horizon: Proyecto -> Cómputo -> Instancias -> iaas-cirros.
 
-Primera ejecución de la demostración
+SSH al nodo:
+  ssh -i ~/.ssh/devstack_ed25519 rocky@192.168.122.134
 
-PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
+La contraseña se encuentra en el vault local ansible/rocky/secrets.yml y no se
+incluye en el paquete de entrega.
 
-TASK [Gathering Facts] *********************************************************
-ok: [iaas-rocky]
+==============================================================================
+5. VALIDACIONES DEL PROYECTO
+==============================================================================
 
-TASK [Copiar el script de demostración] ****************************************
-changed: [iaas-rocky]
-
-TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
-changed: [iaas-rocky]
-
-TASK [Mostrar estado, red y evidencia de arranque] *****************************
-ok: [iaas-rocky] => {
-    "demo.stdout_lines": [
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "| ID                                   | Binary       | Host           | Zone | Status  | State | Updated At                 |",
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "| 064a4bb4-77b8-4676-bac4-09d314da20bd | nova-compute | devstack-rocky | nova | enabled | up    | 2026-11-19T22:55:09.000000 |",
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "VM_CREADA",
-        "+-----------+---------------------------------------------------------+",
-        "| Field     | Value                                                   |",
-        "+-----------+---------------------------------------------------------+",
-        "| addresses | private=10.0.0.11, fddb:4b63:968f:0:f816:3eff:fe3b:2075 |",
-        "| id        | 6d7c339e-1cd1-493a-be02-177d5b3214a9                    |",
-        "| name      | iaas-cirros                                             |",
-        "| status    | ACTIVE                                                  |",
-        "+-----------+---------------------------------------------------------+",
-        "CirrOS presentó el inicio de sesión en la consola."
-    ]
-}
-
-PLAY RECAP *********************************************************************
-iaas-rocky                 : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-
-
-Segunda ejecución de la demostración
-
-PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
-
-TASK [Gathering Facts] *********************************************************
-ok: [iaas-rocky]
-
-TASK [Copiar el script de demostración] ****************************************
-ok: [iaas-rocky]
-
-TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
-ok: [iaas-rocky]
-
-TASK [Mostrar estado, red y evidencia de arranque] *****************************
-ok: [iaas-rocky] => {
-    "demo.stdout_lines": [
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "| ID                                   | Binary       | Host           | Zone | Status  | State | Updated At                 |",
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "| 064a4bb4-77b8-4676-bac4-09d314da20bd | nova-compute | devstack-rocky | nova | enabled | up    | 2026-11-19T22:55:09.000000 |",
-        "+--------------------------------------+--------------+----------------+------+---------+-------+----------------------------+",
-        "+-----------+---------------------------------------------------------+",
-        "| Field     | Value                                                   |",
-        "+-----------+---------------------------------------------------------+",
-        "| addresses | private=10.0.0.11, fddb:4b63:968f:0:f816:3eff:fe3b:2075 |",
-        "| id        | 6d7c339e-1cd1-493a-be02-177d5b3214a9                    |",
-        "| name      | iaas-cirros                                             |",
-        "| status    | ACTIVE                                                  |",
-        "+-----------+---------------------------------------------------------+",
-        "CirrOS presentó el inicio de sesión en la consola."
-    ]
-}
-
-PLAY RECAP *********************************************************************
-iaas-rocky                 : ok=4    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-
-
-Verificación de libvirt y Horizon
-Rocky Linux release 9.9 (Blue Onyx)
-x86_64
-python3.11-3.11.13-10.el9_8.x86_64
-rabbitmq-server-3.9.21-2.el9s.x86_64
-mariadb-server-10.5.29-5.el9.x86_64
-Permissive
-openstack 9.0.1
- Id   Name              State
----------------------------------
- 4    devstack-rocky    running
- -    devstack-ubuntu   saved
-
- Id   Name                State
------------------------------------
- 1    instance-00000001   running
-
-<domain type='kvm' id='1'>
-  <name>instance-00000001</name>
-  <uuid>6d7c339e-1cd1-493a-be02-177d5b3214a9</uuid>
-Horizon HTTP 200, sesión demo iniciada, iaas-cirros visible
-
-Aprovisionamiento con Terraform en libvirt de sistema
-Prueba con Rocky 9.9, red de gestión existente por DHCP y red aislada netstack.
-Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
-horizon_url = "http://192.168.211.84/dashboard/"
-Rocky Linux release 9.9 (Blue Onyx)
-devstack-ext     UP             52:54:01:5c:63:81 <BROADCAST,MULTICAST,UP,LOWER_UP>
-No changes. Your infrastructure matches the configuration.
-
-Aprovisionamiento en libvirt de sesión para la prueba con Ansible
-Rocky 9.9 arrancó con UEFI, cloud-init terminó, el disco vda mostró 65 GiB y /dev/kvm estaba presente.
-No changes. Your infrastructure matches the configuration.
-
-Demostración con inventario generado por Terraform, variante de una interfaz
-El ensayo recuperó la instalación tras detener los servicios y reutilizar dependencias en caché. stack.sh completó y Nova quedó activo.
-rockystack-tf              : ok=17   changed=1    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
-
-PLAY [Desplegar y verificar una instancia dentro de OpenStack] *****************
-
-TASK [Gathering Facts] *********************************************************
-ok: [rockystack-tf]
-
-TASK [Copiar el script de demostración] ****************************************
-changed: [rockystack-tf]
-
-TASK [Verificar Nova y lanzar CirrOS en la red privada] ************************
-changed: [rockystack-tf]
-
-TASK [Mostrar estado, red y evidencia de arranque] *****************************
-ok: [rockystack-tf] => {
-    "demo.stdout_lines": [
-        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
-        "| ID                                   | Binary       | Host          | Zone | Status  | State | Updated At                 |",
-        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
-        "| a8a6c2a9-09d8-4b50-bce2-d8cf5946af6f | nova-compute | rockystack-tf | nova | enabled | up    | 2026-11-20T01:01:53.000000 |",
-        "+--------------------------------------+--------------+---------------+------+---------+-------+----------------------------+",
-        "VM_CREADA",
-        "+-----------+---------------------------------------------------------+",
-        "| Field     | Value                                                   |",
-        "+-----------+---------------------------------------------------------+",
-        "| addresses | private=10.0.0.45, fdf5:1b8a:e5a8:0:f816:3eff:fe47:6539 |",
-        "| id        | 90cb300a-9d78-45e3-b683-8d4a2bc155b8                    |",
-        "| name      | iaas-cirros                                             |",
-        "| status    | ACTIVE                                                  |",
-        "+-----------+---------------------------------------------------------+",
-        "CirrOS presentó el inicio de sesión en la consola."
-    ]
-}
-
-PLAY RECAP *********************************************************************
-rockystack-tf              : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-
-Horizon del nodo creado por Terraform HTTP 200
+  terraform fmt -check: correcto
+  terraform validate: correcto
+  ansible-playbook --syntax-check preconfig.yml: correcto
+  ansible-playbook --syntax-check demo.yml: correcto
+  bash -n workspace/deploy-cirros.sh: correcto

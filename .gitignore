@@ -1,8 +1,8 @@
-ansible/ubuntu/inventory.yml
-ansible/ubuntu/secrets.yml
 *.retry
 ansible/rocky/inventory.yml
 ansible/rocky/secrets.yml
+ansible/rocky/.vault_pass
+ansible/rocky/admin-password
 
 # Artefactos locales de Terraform
 .terraform/

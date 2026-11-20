@@ -30,7 +30,7 @@ variable "cpu" {
 variable "disk_size_gib" {
   description = "Tamaño del disco de trabajo de Rocky en GiB."
   type        = number
-  default     = 65
+  default     = 45
 }
 
 variable "pool_path" {

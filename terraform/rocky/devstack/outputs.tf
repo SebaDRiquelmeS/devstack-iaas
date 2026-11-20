@@ -19,6 +19,7 @@ output "ansible_inventory" {
         ansible_host               = local.management_ip
         ansible_user               = "rocky"
         ansible_python_interpreter = "/usr/bin/python3"
+        ansible_ssh_common_args    = "-o StrictHostKeyChecking=accept-new"
         devstack_host_ip           = local.management_ip
         }, var.enable_netstack ? {
         devstack_public_interface = "devstack-ext"

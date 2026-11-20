@@ -6,4 +6,5 @@ all:
           ansible_host: 192.0.2.10
           ansible_user: rocky
           ansible_python_interpreter: /usr/bin/python3
+          ansible_ssh_common_args: -o StrictHostKeyChecking=accept-new
           devstack_host_ip: 192.0.2.10

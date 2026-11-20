@@ -3,3 +3,15 @@ ansible/ubuntu/secrets.yml
 *.retry
 ansible/rocky/inventory.yml
 ansible/rocky/secrets.yml
+
+# Artefactos locales de Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+*_override.tf
+override.tf
+crash.log
+crash.*.log

@@ -161,3 +161,15 @@ openstack 9.0.1
   <name>instance-00000001</name>
   <uuid>6d7c339e-1cd1-493a-be02-177d5b3214a9</uuid>
 Horizon HTTP 200, sesión demo iniciada, iaas-cirros visible
+
+Aprovisionamiento con Terraform en libvirt de sistema
+Prueba con Rocky 9.9, red de gestión existente por DHCP y red aislada netstack.
+Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
+horizon_url = "http://192.168.211.84/dashboard/"
+Rocky Linux release 9.9 (Blue Onyx)
+devstack-ext     UP             52:54:01:5c:63:81 <BROADCAST,MULTICAST,UP,LOWER_UP>
+No changes. Your infrastructure matches the configuration.
+
+Aprovisionamiento en libvirt de sesión para la prueba con Ansible
+Rocky 9.9 arrancó con UEFI, cloud-init terminó, el disco vda mostró 65 GiB y /dev/kvm estaba presente.
+No changes. Your infrastructure matches the configuration.

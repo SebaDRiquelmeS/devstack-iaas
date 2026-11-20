@@ -2,9 +2,25 @@
 - name: Instalar OpenStack DevStack en Rocky Linux 9
   hosts: devstack
   become: true
+  gather_facts: false
   vars:
     stack_dir: /opt/stack/devstack
     devstack_revision: da2f4d73f5ad74fc8ecfbe15bd7e20f6b0982dbb
+  pre_tasks:
+    - name: Esperar a que Rocky acepte conexiones SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Esperar a cloud-init si existe en el nodo
+      ansible.builtin.shell: |
+        if command -v cloud-init >/dev/null; then
+          cloud-init status --wait
+        fi
+      changed_when: false
+
+    - name: Recopilar datos del nodo
+      ansible.builtin.setup:
+
   tasks:
     - name: Comprobar distribución, arquitectura e IP de gestión
       ansible.builtin.assert:
@@ -14,6 +30,17 @@
           - ansible_facts.architecture == 'x86_64'
           - devstack_host_ip in ansible_facts.all_ipv4_addresses
         fail_msg: Usa Rocky Linux 9 amd64 con una IPv4 estable asignada al nodo.
+
+    - name: Validar los parámetros de la segunda interfaz
+      ansible.builtin.assert:
+        that:
+          - devstack_public_interface in ansible_facts.interfaces
+          - devstack_public_interface != (ansible_facts.default_ipv4.interface | default(""))
+          - devstack_public_interface is match('^[A-Za-z0-9_.-]+$')
+          - (devstack_floating_range | default('')) is match('^[0-9.]+/[0-9]+$')
+          - (devstack_public_gateway | default('')) is match('^[0-9.]+$')
+        fail_msg: La red externa requiere una interfaz dedicada, un rango y una puerta de enlace.
+      when: devstack_public_interface is defined
 
     - name: Validar contraseña alfanumérica
       ansible.builtin.assert:

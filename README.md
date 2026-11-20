@@ -1,8 +1,14 @@
 # OpenStack DevStack en Rocky Linux 9
 
-Laboratorio IaaS de un solo nodo con KVM. Ansible prepara Rocky Linux, instala OpenStack y crea una VM CirrOS para comprobar Nova, Glance y Neutron. Horizon permite consultar la instancia desde el navegador.
+Laboratorio IaaS de un solo nodo. Terraform crea la VM Rocky en KVM/libvirt, cloud-init configura el acceso por SSH y Ansible instala OpenStack y despliega una instancia CirrOS.
 
-El proyecto sigue la estructura por distribución en `ansible/rocky/` y la separación de pruebas en `workspace/` del [repositorio de referencia](https://gitlab.com/alejandro.mellado/devstack/-/tree/ea1f18bc8d501e56aaaad293aab8dd187a7398a5).
+| Carpeta | Función |
+|---|---|
+| `terraform/rocky/devstack/` | Prepara el pool, la imagen Rocky, el disco, cloud-init y la VM. Usa la red de gestión de libvirt y crea una segunda red tipo `netstack`. |
+| `ansible/rocky/` | Prepara Rocky e instala DevStack con el inventario que produce Terraform. |
+| `workspace/` | Contiene la prueba que ejecuta `ansible/demo.yml` para desplegar y verificar CirrOS. |
+
+La estructura y el orden del despliegue siguen el [repositorio de referencia](https://gitlab.com/alejandro.mellado/devstack/-/tree/ea1f18bc8d501e56aaaad293aab8dd187a7398a5).
 
 ## Análisis inicial
 
@@ -22,30 +28,56 @@ Fuentes oficiales. [DevStack 2026.1](https://docs.openstack.org/devstack/2026.1/
 - Rocky usa MariaDB como servidor de base de datos. El cliente OpenStack queda en `/usr/local/bin`, que el script de prueba agrega a su ruta para ejecutarse también bajo sudo.
 - El instalador de DevStack deja SELinux en modo permisivo en Rocky para que Apache sirva Horizon. Se ejecuta en un invitado dedicado y se publican SSH y Horizon únicamente en la interfaz local del anfitrión.
 
-## Despliegue
+## Despliegue desde cero
 
-1. Prepara un nodo dedicado Rocky Linux 9 amd64 con IPv4 estable, acceso SSH con sudo, salida a Internet y `/dev/kvm`. Si el nodo es una VM, habilita virtualización anidada. El nodo de esta práctica usa 6 vCPU, 8 GiB de RAM y un disco virtual de 65 GiB.
-2. Desde un controlador Linux con Python 3.12 o posterior, instala Ansible Core. El laboratorio se verificó con Ansible Core 2.21.6. A continuación copia el inventario y crea el archivo cifrado. Configura `ansible_host` para SSH y `devstack_host_ip` con la dirección IPv4 dentro del nodo. En el archivo cifrado, pon `devstack_admin_password` con un valor alfanumérico de 16 a 64 caracteres.
+Usa un anfitrión Linux x86_64 con QEMU/KVM (incluido `qemu-img`), libvirt, firmware UEFI para QEMU (OVMF), Terraform 1.5 o posterior y OpenSSH. Comprueba que la virtualización anidada esté habilitada y que tu usuario tenga acceso a libvirt. Los comandos están pensados para ejecutarse en el anfitrión KVM, que debe poder llegar por SSH a la VM.
 
-   ```bash
-   pipx install ansible-core==2.21.6
-   cp ansible/rocky/inventory.example.yml ansible/rocky/inventory.yml
-   ansible-vault create ansible/rocky/secrets.yml
-   ```
+```bash
+git clone https://github.com/SebaDRiquelmeS/devstack-iaas.git
+cd devstack-iaas
+virsh -c qemu:///system list --all
+virsh -c qemu:///system net-list --all
+```
 
-   Comprueba el acceso al nodo con `ssh rocky@IP_DEL_NODO` antes de ejecutar Ansible. Ajusta `ansible_user` si usas otra cuenta con sudo.
+### 1. Terraform crea Rocky
 
-3. Instala la plataforma y levanta CirrOS. Agrega `--ask-become-pass` si sudo solicita contraseña.
+La red libvirt `default` debe estar activa y ofrecer DHCP y salida a Internet. Puedes seleccionar otra red existente con `management_network`. Usa la clave pública que corresponda a tu cliente SSH. Si aún no tienes una, puedes crearla con `ssh-keygen -t ed25519`.
 
-   ```bash
-   ansible-playbook -i ansible/rocky/inventory.yml ansible/rocky/preconfig.yml \
-     --ask-vault-pass -e @ansible/rocky/secrets.yml
-   ansible-playbook -i ansible/rocky/inventory.yml ansible/demo.yml
-   ```
+```bash
+cp terraform/rocky/devstack/terraform.tfvars.example terraform/rocky/devstack/terraform.tfvars
+terraform -chdir=terraform/rocky/devstack init
+terraform -chdir=terraform/rocky/devstack plan
+terraform -chdir=terraform/rocky/devstack apply
+terraform -chdir=terraform/rocky/devstack output -raw ansible_inventory > ansible/rocky/inventory.yml
+```
 
-La instalación guarda su registro en `/opt/stack/logs/stack.sh.log`. Ansible marca el nodo como instalado una vez que `stack.sh` finaliza con éxito. La prueba consulta Nova, crea o reutiliza `iaas-cirros` y espera el inicio de sesión en la consola.
+Si tu instalación usa los daemons modulares de libvirt y Terraform indica que falta `libvirt-sock`, habilita el socket `virtproxyd.socket` del sistema. Antes de ejecutar Ansible, comprueba la identidad SSH del invitado en su consola y conéctate una vez como `rocky` a la IP del inventario para registrar su clave de host.
 
-En una instalación nueva, abre `http://IP_DEL_NODO/dashboard/` desde una red con acceso al nodo e ingresa como `demo` con la contraseña que configuraste.
+La descarga de la imagen y de los repositorios de DevStack puede tardar en el primer despliegue. El módulo descarga una imagen oficial Rocky 9 GenericCloud. Si ya la verificaste y la tienes descargada, puedes indicar su ruta absoluta con `rocky_image`. La VM usa UEFI, CPU `host-passthrough` y un disco QCOW2 de 65 GiB. cloud-init adjunta la clave SSH pública para `rocky` y configura las interfaces por su MAC. En virt-manager aparece como `rockystack` en la conexión de sistema.
+
+En el flujo de dos interfaces, `netstack` usa `172.24.4.0/24` para las IP flotantes y la interfaz de gestión conserva la salida a Internet. Si ese rango ya está en uso, configura otro IPv4 /24 con `netstack_cidr`. Elige redes que no se superpongan con la red privada de OpenStack. Establece `enable_netstack = false` para usar una sola interfaz con la configuración de red predeterminada de DevStack. El inventario generado incluye la IP de gestión y, si se habilitó, la interfaz externa de Neutron.
+
+### 2. Ansible instala DevStack
+
+Desde el anfitrión con Python 3.12 o posterior y pipx, instala la versión de Ansible Core con la que se verificó el laboratorio. Crea el archivo cifrado y agrega la variable `devstack_admin_password` con un valor alfanumérico de 16 a 64 caracteres.
+
+```bash
+pipx install ansible-core==2.21.6
+ansible-vault create ansible/rocky/secrets.yml
+ansible-playbook -i ansible/rocky/inventory.yml ansible/rocky/preconfig.yml \
+  --ask-vault-pass -e @ansible/rocky/secrets.yml
+```
+
+Ansible espera SSH y cloud-init, comprueba `/dev/kvm` e instala DevStack. El registro de instalación queda en `/opt/stack/logs/stack.sh.log`. Si usas otra clave privada, agrega `--private-key RUTA` a ambos comandos `ansible-playbook`. Si tu usuario solicita contraseña para sudo, agrega `--ask-become-pass`. Para usar una VM Rocky ya existente, copia `ansible/rocky/inventory.example.yml` a `ansible/rocky/inventory.yml` y configura sus direcciones y usuario.
+
+### 3. Verifica CirrOS y Horizon
+
+```bash
+ansible-playbook -i ansible/rocky/inventory.yml ansible/demo.yml
+terraform -chdir=terraform/rocky/devstack output -raw horizon_url
+```
+
+La prueba verifica Nova, crea o reutiliza `iaas-cirros` y espera el inicio de sesión en consola. En la URL de Horizon, entra como `demo` con la contraseña configurada y abre **Proyecto → Cómputo → Instancias**.
 
 ## Evidencia del laboratorio original
 

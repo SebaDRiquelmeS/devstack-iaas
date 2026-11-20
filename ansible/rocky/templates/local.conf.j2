@@ -8,3 +8,10 @@ LIBVIRT_TYPE=kvm
 LOGFILE=/opt/stack/logs/stack.sh.log
 PYTHON3_VERSION=3.11
 disable_service tempest
+{% if devstack_public_interface is defined %}
+PUBLIC_INTERFACE={{ devstack_public_interface }}
+FLOATING_RANGE={{ devstack_floating_range }}
+PUBLIC_NETWORK_GATEWAY={{ devstack_public_gateway }}
+Q_USE_PROVIDERNET_FOR_PUBLIC=True
+Q_ASSIGN_GATEWAY_TO_PUBLIC_BRIDGE=False
+{% endif %}
